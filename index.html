@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Precise Barcode Scanner</title>
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        #scanner-container {
+            margin: 20px auto;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        #scanner {
+            width: 100%;
+            height: 300px;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #result {
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2ecc71;
+            background: #f9f9f9;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            border: 2px solid rgba(0, 255, 0, 0.5);
+            box-sizing: border-box;
+        }
+        .scanner-active #overlay {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { border-color: rgba(0, 255, 0, 0.5); }
+            50% { border-color: rgba(0, 255, 0, 0.8); }
+            100% { border-color: rgba(0, 255, 0, 0.5); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Precise Barcode Scanner</h1>
+    <p>Point your camera at a barcode to scan</p>
+
+    <div id="scanner-container">
+        <div id="scanner">
+            <p>Camera feed will appear here</p>
+        </div>
+        <div id="overlay"></div>
+    </div>
+
+    <div id="result">No barcode detected yet</div>
+
+    <button id="start-btn">Start Scanner</button>
+    <button id="stop-btn" disabled>Stop Scanner</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const scannerContainer = document.getElementById('scanner-container');
+            const resultDiv = document.getElementById('result');
+            const scannerDiv = document.getElementById('scanner');
+            let isScanning = false;
+
+            // Start Scanner
+            startBtn.addEventListener('click', startScanner);
+            stopBtn.addEventListener('click', stopScanner);
+
+            function startScanner() {
+                if (isScanning) return;
+                isScanning = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                scannerContainer.classList.add('scanner-active');
+                scannerDiv.innerHTML = '';
+
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: scannerDiv,
+                        constraints: {
+                            width: 640,
+                            height: 480,
+                            facingMode: "environment" // Use rear camera
+                        },
+                    },
+                    decoder: {
+                        readers: [
+                            "ean_reader",
+                            "ean_8_reader",
+                            "code_128_reader",
+                            "code_39_reader",
+                            "upc_reader",
+                            "upc_e_reader"
+                        ],
+                        multiple: false // Stop after first detection
+                    },
+                    locate: true // Helps with precision
+                }, function(err) {
+                    if (err) {
+                        console.error(err);
+                        resultDiv.textContent = "Error: " + err.message;
+                        stopScanner();
+                        return;
+                    }
+                    Quagga.start();
+                });
+
+                Quagga.onDetected(function(result) {
+                    if (!isScanning) return;
+                    const code = result.codeResult.code;
+                    resultDiv.textContent = "Scanned: " + code;
+                    
+                    // Optional: Play a success sound
+                    const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+                    audio.play().catch(e => console.log("Audio error:", e));
+                    
+                    // Optional: Vibrate on mobile
+                    if (navigator.vibrate) navigator.vibrate(200);
+                });
+            }
+
+            function stopScanner() {
+                if (!isScanning) return;
+                isScanning = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                scannerContainer.classList.remove('scanner-active');
+                Quagga.stop();
+                scannerDiv.innerHTML = '<p>Scanner stopped</p>';
+            }
+
+            // Stop scanner when page is hidden
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden && isScanning) {
+                    stopScanner();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
